@@ -14,7 +14,7 @@ addr2name['RGZ2JZEFsRgEqngQn4vUYi2mPydMWygPdX']  = 'zpool.ca';
 addr2name['RMkqWYHQuN9a4XsrP3CgHnmpnaUvcSp95p']  = 'gigarho.com';
 
 const POOLAPI = 'https://hobbyistpool.ddns.net/nyc/index.php?page=api&action=public';
-const BLOCKEXPLORERAPI = 'http://hobbyistpool.ddns.net:6001/api/';
+const BLOCKEXPLORERAPI = 'https://explorer.nycoin.community/api/';
 const request = require('requestretry').defaults({
         maxAttempts: 3,
         retryDelay: 5000,
@@ -73,7 +73,6 @@ const db = new Influx.InfluxDB({
                                 'poolName',
                         ]
                 },
-        ]
         ]
 });
 
