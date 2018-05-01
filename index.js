@@ -1,17 +1,16 @@
 #!/usr/local/bin/node
 'use strict';
 
-const TICK_SEC = 15;
-
 var addr2name = new Object();
 addr2name['RMNdYUXmTr1LhBT9qKvg48ic73QKAwFY11'] = addr2name['RXDXVzfB7sEThmtLqpzS8QnKzc6MT4rDQa']  = 'prohashing.com';
+addr2name['RAhEUbJsfzcBJjdqdECoQ7EXawzYubFTuB'] = addr2name['RNra5LWEinBh7uikkSZxRuRg114PUbeqSL']  = 'https://hobbyistpool.ddns.net/nyc Developer Pool';
+addr2name['RBbZPTntFix1cHxm7PxtgeKaKyqZbN5KvJ'] = addr2name['RMR7DfZEBPDyXd1rCbARAK7YQMMSPByz79']  = 'nyc.mypool.club';
 addr2name['RQrGu6KtsYMbH6cRNiQdnLcy4meofzAWHS']  = 'mastermining.net';
-addr2name['RNra5LWEinBh7uikkSZxRuRg114PUbeqSL']  = 'https://hobbyistpool.ddns.net/nyc Developer Pool';
-addr2name['RVcmwoMpMrNppQeCrKWnZkzwX8ubdpGZYo']  = 'newyorkcoinpool.com';
 addr2name['RB8trkrKbXQ8AaRhnUxcdBNnc4swCynRDF']  = 'mining-dutch.nl';
-addr2name['RMR7DfZEBPDyXd1rCbARAK7YQMMSPByz79']  = 'nyc.mypool.club';
 addr2name['RGZ2JZEFsRgEqngQn4vUYi2mPydMWygPdX']  = 'zpool.ca';
 addr2name['RMkqWYHQuN9a4XsrP3CgHnmpnaUvcSp95p']  = 'gigarho.com';
+addr2name['RMR7DfZEBPDyXd1rCbARAK7YQMMSPByz79']  = 'nyc.mypool.club';
+addr2name['RVcmwoMpMrNppQeCrKWnZkzwX8ubdpGZYo']  = 'newyorkcoinpool.com';
 
 const POOLAPI = 'https://hobbyistpool.ddns.net/nyc/index.php?page=api&action=public';
 const BLOCKEXPLORERAPI = 'http://hobbyistpool.ddns.net:6001/api/';
@@ -56,7 +55,7 @@ const db = new Influx.InfluxDB({
                                 timestamp: Influx.FieldType.INTEGER,
                         },
                         tags: [
-                                'coinName',
+                               'coinName',
                                'poolName',
                         ]
                 },
@@ -92,21 +91,55 @@ function beApiReq(endpoint, arg) {
 }
 
 function dbWriteHashStats() {
-        beApiReq('getnetworkhashps').then(function(hps) {
+	beApiReq('getnetworkhashps').then(function(hps) {
+		db.writePoints([{
+			measurement: 'netStats',
+			fields: { hps: hps },
+			tags: { coinName: 'NYCoin' },
+		}], {
+			precision: 's',
+		}).catch(err => {
+			console.error(err);
+		});
+	});
+}
+
+function dbWritePoolStats() {
+        var options = {
+                uri: POOLAPI,
+                headers: {
+                        'Accept': 'application/json',
+                        'User-Agent': 'lta',
+                },
+                json: true,
+        };
+        request(options).then(function(hp) {
                 db.writePoints([{
-                        measurement: 'netStats',
-                        fields: { hps: hps },
-                        tags: { coinName: 'NYCoin' },
+                        measurement: 'pool',
+                        fields: {
+                                poolHps: hp.hashrate,
+                                workers: hp.workers,
+				sharesThisRound: hp.shares_this_round,
+                                lastFound: hp.last_block,
+                                hps: hp.network_hashrate,
+                        },
+                        tags: { poolName: hp.pool_name },
                 }], {
                         precision: 's',
                 }).catch(err => {
                         console.error(err);
                 });
+        }).catch(err => {
+                console.error(err);
         });
 }
 
+var lastHeight = 0;
 function dbWriteBlockStats() {
         beApiReq('getblockcount').then(function(height) {
+                if (height == lastHeight)
+                        return;
+                lastHeight = height;
                 beApiReq('getblockhash?index=', height).then(function(hash) {
                         beApiReq('getblock?hash=', hash).then(function(block) {
                                 beApiReq('getrawtransaction?txid=', block.tx[0] + '&decrypt=1').then(function(tx) {
@@ -146,40 +179,10 @@ function dbWriteBlockStats() {
         });
 }
 
-function dbWritePoolStats() {
-        var options = {
-                uri: POOLAPI,
-                headers: {
-                        'Accept': 'application/json',
-                        'User-Agent': 'lta',
-                },
-                json: true,
-        };
-        request(options).then(function(hp) {
-		console.log(hp);
-                db.writePoints([{
-                        measurement: 'pool',
-                        fields: {
-                                poolHps: hp.hashrate,
-                                workers: hp.workers,
-				sharesThisRound: hp.shares_this_round,
-                                lastFound: hp.last_block,
-                                hps: hp.network_hashrate,
-                        },
-                        tags: { poolName: hp.pool_name },
-                }], {
-                        precision: 's',
-                }).catch(err => {
-                        console.error(err);
-                });
-        }).catch(err => {
-                console.error(err);
-        });
-}
 
 dbWriteHashStats();
-dbWriteBlockStats();
 dbWritePoolStats();
-setInterval(function() { dbWriteHashStats(); }, TICK_SEC * 1000);
-setInterval(function() { dbWriteBlockStats(); }, TICK_SEC * 1000);
-setInterval(function() { dbWritePoolStats(); }, TICK_SEC * 1000);
+dbWriteBlockStats();
+setInterval(function() { dbWriteHashStats(); }, 15 * 1000);
+setInterval(function() { dbWritePoolStats(); }, 15 * 1000);
+setInterval(function() { dbWriteBlockStats(); }, 5 * 1000);
