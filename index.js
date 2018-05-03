@@ -15,6 +15,7 @@ addr2name['RGoDKEHbCHHzHo6ufXa9iuDKyGGfMt1q1k']  = 'mcpny.com';
 
 const POOLAPI = 'https://hobbyistpool.ddns.net/nyc/index.php?page=api&action=public';
 const BLOCKEXPLORERAPI = 'http://hobbyistpool.ddns.net:6001/api/';
+const CMCAPI = 'https://api.coinmarketcap.com/v1/ticker/newyorkcoin/'
 const request = require('requestretry').defaults({
         maxAttempts: 3,
         retryDelay: 5000,
@@ -27,6 +28,23 @@ const db = new Influx.InfluxDB({
         database: 'coinStats',
         schema:
         [
+                {
+                        measurement: 'priceStats',
+                        fields: {
+                                rank: Influx.FieldType.INTEGER,
+                                price_usd: Influx.FieldType.FLOAT,
+                                price_btc: Influx.FieldType.FLOAT,
+                                volume_usd: Influx.FieldType.FLOAT,
+                                market_cap_usd: Influx.FieldType.FLOAT,
+                                supply: Influx.FieldType.INTEGER,
+                                percent_change_1h: Influx.FieldType.FLOAT,
+                                percent_change_24h: Influx.FieldType.FLOAT,
+                                percent_change_7d: Influx.FieldType.FLOAT,
+                        },
+                        tags: [
+                                'coinName',
+                        ]
+                },
                 {
                         measurement: 'netStats',
                         fields: {
@@ -75,7 +93,6 @@ const db = new Influx.InfluxDB({
                 },
         ]
 });
-
 
 function beApiReq(endpoint, arg) {
         if (arg == null)
@@ -180,10 +197,46 @@ function dbWriteBlockStats() {
         });
 }
 
+function dbWritePriceStats() {
+        var options = {
+                uri: CMCAPI,
+                headers: {
+                        'Accept': 'application/json',
+                        'User-Agent': 'lta',
+                },
+                json: true,
+        };
+        request(options).then(function(priceStatsContainer) {
+                const priceStats = priceStatsContainer[0];
+                db.writePoints([{
+                        measurement: 'priceStats',
+                        fields: {
+                                rank: priceStats.rank,
+                                price_usd: priceStats.price_usd,
+                                price_btc: priceStats.price_btc,
+                                volume_usd: priceStats['24h_volume_usd'],
+                                market_cap_usd: priceStats.market_cap_usd,
+                                supply: priceStats.total_supply,
+                                percent_change_1h: priceStats.percent_change_1h,
+                                percent_change_24h: priceStats.percent_change_24h,
+                                percent_change_7d: priceStats.percent_change_7d,
+                        },
+                        tags: { coinName: 'NYCoin' },
+                }], {
+                        precision: 's',
+                }).catch(err => {
+                        console.error(err);
+                });
+        }).catch(err => {
+                console.error(err);
+        });
+}
 
 dbWriteHashStats();
 dbWritePoolStats();
 dbWriteBlockStats();
+dbWritePriceStats();
 setInterval(function() { dbWriteHashStats(); }, 15 * 1000);
 setInterval(function() { dbWritePoolStats(); }, 15 * 1000);
 setInterval(function() { dbWriteBlockStats(); }, 5 * 1000);
+setInterval(function() { dbWritePriceStats(); }, 60 * 1000);
