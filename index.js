@@ -118,7 +118,7 @@ function dbWritePoolStats() {
                 db.writePoints([{
                         measurement: 'pool',
                         fields: {
-                                poolHps: hp.hashrate,
+                                poolHps: hp.hashrate * 1000, // reported in KH/s
                                 workers: hp.workers,
 				sharesThisRound: hp.shares_this_round,
                                 lastFound: hp.last_block,
@@ -162,14 +162,14 @@ function dbWriteBlockStats() {
                                 });
                                 db.writePoints([{
                                         measurement: 'blockStats',
-                                                fields: {
-							height: parseInt(block.height),
-							diff: parseFloat(block.difficulty),
-							size: parseInt(block.size),
-							timestamp: parseInt(block.time),
-							txs: block.tx.length,
-                                                },
-                                                tags: { coinName: 'NYCoin' },
+                                        fields: {
+						height: parseInt(block.height),
+						diff: parseFloat(block.difficulty),
+						size: parseInt(block.size),
+						timestamp: parseInt(block.time),
+						txs: block.tx.length,
+                                        },
+                                        tags: { coinName: 'NYCoin' },
                                 }], {
                                         precision: 's',
                                 }).catch(err => {
