@@ -15,7 +15,9 @@ addr2name['RGoDKEHbCHHzHo6ufXa9iuDKyGGfMt1q1k']  = 'mcpny.com';
 
 const POOLAPI = 'https://hobbyistpool.ddns.net/nyc/index.php?page=api&action=public';
 const BLOCKEXPLORERAPI = 'http://hobbyistpool.ddns.net:6001/api/';
-const CMCAPI = 'https://api.coinmarketcap.com/v1/ticker/newyorkcoin/'
+const CMCAPI = 'https://api.coinmarketcap.com/v1/ticker/newyorkcoin/';
+const YOBITAPI = 'https://yobit.io/api/3/ticker/nyc_btc-nyc_eth-nyc_doge-nyc_waves-nyc_usd-nyc_rur';
+
 const request = require('requestretry').defaults({
         maxAttempts: 3,
         retryDelay: 5000,
@@ -89,6 +91,18 @@ const db = new Influx.InfluxDB({
                         },
                         tags: [
                                 'poolName',
+                        ]
+                },
+                {
+                        measurement: 'YoBit',
+                        fields: {
+                                vol: Influx.FieldType.FLOAT,
+                                volNYC: Influx.FieldType.FLOAT,
+                                price: Influx.FieldType.FLOAT,
+                                lastUpdate: Influx.FieldType.INTEGER,
+                        },
+                        tags: [
+                                'pair',
                         ]
                 },
         ]
@@ -232,11 +246,43 @@ function dbWritePriceStats() {
         });
 }
 
+function dbWriteYobitStats() {
+        var options = {
+                uri: YOBITAPI,
+                headers: {
+                        'Accept': 'application/json',
+                        'User-Agent': 'lta',
+                },
+                json: true,
+	};
+
+	request(options).then(function(tickers) {
+		for (var pair in tickers) {
+			db.writePoints([{
+				measurement: 'YoBit',
+				fields: {
+					vol: tickers[pair].vol,
+					volNYC: tickers[pair].vol_cur,
+					price: tickers[pair].last,
+					lastUpdate: tickers[pair].updated,
+				},
+			tags: { pair: pair },
+			}], {
+				precision: 's',
+			}).catch(err => {
+				console.error(err);
+			});
+		}
+	});
+}
+
 dbWriteHashStats();
 dbWritePoolStats();
 dbWriteBlockStats();
 dbWritePriceStats();
+dbWriteYobitStats();
 setInterval(function() { dbWriteHashStats(); }, 15 * 1000);
 setInterval(function() { dbWritePoolStats(); }, 15 * 1000);
 setInterval(function() { dbWriteBlockStats(); }, 5 * 1000);
 setInterval(function() { dbWritePriceStats(); }, 60 * 1000);
+setInterval(function() { dbWriteYobitStats(); }, 60 * 1000);
