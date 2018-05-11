@@ -1,7 +1,7 @@
 {
   "name": "coinstats",
   "version": "0.0.1",
-  "description": "Consume pool explorer APIs and store stats to InfluxDB",
+  "description": "Consume APIs and store stats to InfluxDB",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

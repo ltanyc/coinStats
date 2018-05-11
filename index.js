@@ -16,7 +16,7 @@ addr2name['RGoDKEHbCHHzHo6ufXa9iuDKyGGfMt1q1k']  = 'mcpny.com';
 const POOLAPI = 'https://hobbyistpool.ddns.net/nyc/index.php?page=api&action=public';
 const BLOCKEXPLORERAPI = 'http://hobbyistpool.ddns.net:6001/api/';
 const CMCAPI = 'https://api.coinmarketcap.com/v1/ticker/newyorkcoin/';
-const YOBITAPI = 'https://yobit.io/api/3/ticker/nyc_btc-nyc_eth-nyc_doge-nyc_waves-nyc_usd-nyc_rur';
+const YOBITAPI = 'https://yobit.io/api/3/ticker/nyc_btc-nyc_eth-nyc_doge-nyc_waves-nyc_usd-nyc_rur-btc_usd-eth_usd-doge_usd-waves_usd-usd_rur';
 
 const request = require('requestretry').defaults({
         maxAttempts: 3,
@@ -99,6 +99,7 @@ const db = new Influx.InfluxDB({
                                 vol: Influx.FieldType.FLOAT,
                                 volNYC: Influx.FieldType.FLOAT,
                                 price: Influx.FieldType.FLOAT,
+                                priceUSD: Influx.FieldType.FLOAT,
                                 lastUpdate: Influx.FieldType.INTEGER,
                         },
                         tags: [
@@ -258,12 +259,22 @@ function dbWriteYobitStats() {
 
 	request(options).then(function(tickers) {
 		for (var pair in tickers) {
+			if (pair.indexOf('nyc_') == -1)
+				continue;
+			var otherSidePair = pair.replace('nyc_', '') + '_usd';
+			var otherSidePriceUSD = 1;
+			if (otherSidePair == 'rur_usd' )
+				otherSidePriceUSD = 1 / tickers['usd_rur'].last;
+			else if (otherSidePair != 'usd_usd' )
+				otherSidePriceUSD = tickers[otherSidePair].last;
+
 			db.writePoints([{
 				measurement: 'YoBit',
 				fields: {
 					vol: tickers[pair].vol,
 					volNYC: tickers[pair].vol_cur,
 					price: tickers[pair].last,
+					priceUSD: otherSidePriceUSD * tickers[pair].last,
 					lastUpdate: tickers[pair].updated,
 				},
 			tags: { pair: pair },
