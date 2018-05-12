@@ -9,6 +9,7 @@
   "author": "lta",
   "license": "GPLv3",
   "dependencies": {
+    "cheerio": "^1.0.0-rc.2",
     "influx": "^5.0.7",
     "requestretry": "^1.13.0"
   }

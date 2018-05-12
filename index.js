@@ -3,7 +3,7 @@
 
 var addr2name = new Object();
 addr2name['RMNdYUXmTr1LhBT9qKvg48ic73QKAwFY11'] = addr2name['RXDXVzfB7sEThmtLqpzS8QnKzc6MT4rDQa']  = 'prohashing.com';
-addr2name['RAhEUbJsfzcBJjdqdECoQ7EXawzYubFTuB'] = addr2name['RNra5LWEinBh7uikkSZxRuRg114PUbeqSL']  = 'https://hobbyistpool.ddns.net/nyc Developer Pool';
+addr2name['RAhEUbJsfzcBJjdqdECoQ7EXawzYubFTuB'] = addr2name['RNra5LWEinBh7uikkSZxRuRg114PUbeqSL']  = 'hobbyistpool.ddns.net/nyc - Developer Pool';
 addr2name['RBbZPTntFix1cHxm7PxtgeKaKyqZbN5KvJ'] = addr2name['RMR7DfZEBPDyXd1rCbARAK7YQMMSPByz79']  = 'nyc.mypool.club';
 addr2name['RQrGu6KtsYMbH6cRNiQdnLcy4meofzAWHS']  = 'mastermining.net';
 addr2name['RB8trkrKbXQ8AaRhnUxcdBNnc4swCynRDF']  = 'mining-dutch.nl';
@@ -24,6 +24,7 @@ const request = require('requestretry').defaults({
         fullResponse: false,
 });
 
+const cheerio = require('cheerio');
 const Influx = require('influx');
 const db = new Influx.InfluxDB({
         host: 'localhost',
@@ -54,6 +55,17 @@ const db = new Influx.InfluxDB({
                         },
                         tags: [
                                 'coinName',
+                        ]
+                },
+                {
+                        measurement: 'top100',
+                        fields: {
+                                balance: Influx.FieldType.FLOAT,
+                                position: Influx.FieldType.INTEGER,
+                        },
+                        tags: [
+				'coinName',
+				'coinboss',
                         ]
                 },
                 {
@@ -109,6 +121,36 @@ const db = new Influx.InfluxDB({
         ]
 });
 
+function dbWriteRichlistStats() {
+	var richlistUrl = BLOCKEXPLORERAPI.replace('api', 'richlist');
+	var options = {
+		uri: richlistUrl,
+		headers: {
+			'User-Agent': 'lta',
+		},
+	};
+	request(options).then(function(body) {
+		var $ = cheerio.load(body);
+		var links = $('#balance tr');
+		for (var i = 1; i < $(links).length; i++) {
+			var pos = $($(links)[i]).children().eq(0).first().text();
+			var addr = $($(links)[i]).children().eq(1).first().text();
+			var bal = $($(links)[i]).children().eq(2).first().text();
+			db.writePoints([{
+				measurement: 'top100',
+				fields: { balance: bal, position: pos },
+				tags: { coinName: 'NYCoin', coinboss: getPoolName(addr) },
+			}], {
+				precision: 's',
+			}).catch(err => {
+				console.error(err);
+			});
+		}
+	}).catch(err => {
+		console.error(err);
+	});
+}
+
 function beApiReq(endpoint, arg) {
         if (arg == null)
                 arg = '';
@@ -120,7 +162,9 @@ function beApiReq(endpoint, arg) {
                 },
                 json: true,
         };
-        return request(options);
+        return request(options).catch(err => {
+                console.error(err);
+        });
 }
 
 function dbWriteHashStats() {
@@ -134,6 +178,8 @@ function dbWriteHashStats() {
 		}).catch(err => {
 			console.error(err);
 		});
+	}).catch(err => {
+		console.error(err);
 	});
 }
 
@@ -167,6 +213,10 @@ function dbWritePoolStats() {
         });
 }
 
+function getPoolName(addr) {
+	return addr2name[addr] == null ? addr : addr2name[addr];
+}
+
 var lastHeight = 0;
 function dbWriteBlockStats() {
         beApiReq('getblockcount').then(function(height) {
@@ -184,7 +234,7 @@ function dbWriteBlockStats() {
                                                 },
                                                 tags: {
 							coinName: 'NYCoin',
-							poolName: addr2name[tx.vout[0].scriptPubKey.addresses[0]] == null ? tx.vout[0].scriptPubKey.addresses[0] : addr2name[tx.vout[0].scriptPubKey.addresses[0]],
+							poolName: getPoolName(tx.vout[0].scriptPubKey.addresses[0]),
                                                 },
                                         }], {
                                                 precision: 's',
@@ -209,6 +259,8 @@ function dbWriteBlockStats() {
                                 });
                         });
                 });
+        }).catch(err => {
+                console.error(err);
         });
 }
 
@@ -284,16 +336,20 @@ function dbWriteYobitStats() {
 				console.error(err);
 			});
 		}
+	}).catch(err => {
+		console.error(err);
 	});
 }
 
+dbWriteRichlistStats();
 dbWriteHashStats();
 dbWritePoolStats();
 dbWriteBlockStats();
 dbWritePriceStats();
 dbWriteYobitStats();
-setInterval(function() { dbWriteHashStats(); }, 15 * 1000);
-setInterval(function() { dbWritePoolStats(); }, 15 * 1000);
-setInterval(function() { dbWriteBlockStats(); }, 5 * 1000);
-setInterval(function() { dbWritePriceStats(); }, 60 * 1000);
-setInterval(function() { dbWriteYobitStats(); }, 60 * 1000);
+setInterval(function() { dbWriteRichlistStats(); }, 60 * 60 * 1000); // every 1 hours
+setInterval(function() { dbWriteHashStats(); }, 15 * 1000); // every 15 sec
+setInterval(function() { dbWritePoolStats(); }, 15 * 1000); // devery 15 sec
+setInterval(function() { dbWriteBlockStats(); }, 5 * 1000); // every 5 sec
+setInterval(function() { dbWritePriceStats(); }, 60 * 1000); // every 60 sec
+setInterval(function() { dbWriteYobitStats(); }, 60 * 1000); // every 60 sec
