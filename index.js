@@ -226,6 +226,11 @@ function dbWriteBlockStats() {
                 beApiReq('getblockhash?index=', height).then(function(hash) {
                         beApiReq('getblock?hash=', hash).then(function(block) {
                                 beApiReq('getrawtransaction?txid=', block.tx[0] + '&decrypt=1').then(function(tx) {
+					if (tx == null || tx.vout[0] == null) {
+						console.error(height, tx);
+						return;
+					}
+
                                         db.writePoints([{
                                                 measurement: 'mining',
                                                 fields: {
