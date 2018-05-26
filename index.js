@@ -12,6 +12,7 @@ addr2name['RMkqWYHQuN9a4XsrP3CgHnmpnaUvcSp95p']  = 'gigarho.com';
 addr2name['RMR7DfZEBPDyXd1rCbARAK7YQMMSPByz79']  = 'nyc.mypool.club';
 addr2name['RVcmwoMpMrNppQeCrKWnZkzwX8ubdpGZYo']  = 'newyorkcoinpool.com';
 addr2name['RGoDKEHbCHHzHo6ufXa9iuDKyGGfMt1q1k']  = 'mcpny.com';
+addr2name['RX8qTkd2VDybmHa6Zf2SDkKrpaNgG6dGQL']  = 'coincave.nl';
 
 const POOLAPI = 'https://hobbyistpool.ddns.net/nyc/index.php?page=api&action=public';
 const BLOCKEXPLORERAPI = 'http://hobbyistpool.ddns.net:6001/api/';
