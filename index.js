@@ -16,6 +16,8 @@ addr2name['RX8qTkd2VDybmHa6Zf2SDkKrpaNgG6dGQL'] = 'coincave.nl';
 
 const POOLAPI = 'https://hobbyistpool.ddns.net/nyc/index.php?page=api&action=public';
 const BLOCKEXPLORERAPI = 'http://hobbyistpool.ddns.net:6001/api/';
+const PEERINFO = 'https://explorer.nycoin.info/api/getpeerinfo';
+const GEOAPI = 'http://ip-api.com/json/';
 const CMCAPI = 'https://api.coinmarketcap.com/v1/ticker/newyorkcoin/';
 const YOBITAPI = 'https://yobit.io/api/3/ticker/nyc_btc-nyc_eth-nyc_doge-nyc_waves-nyc_usd-nyc_rur-btc_usd-eth_usd-doge_usd-waves_usd-usd_rur';
 
@@ -119,8 +121,60 @@ const db = new Influx.InfluxDB({
                                 'pair',
                         ]
                 },
+                {
+                        measurement: 'peerInfo',
+                        fields: {
+                                address: Influx.FieldType.STRING,
+                        },
+                        tags: [
+                                'country',
+                                'countryCode',
+                                'protocol',
+                                'version',
+                        ]
+                },
         ]
 });
+
+function dbWritePeerStats() {
+	var options = {
+		uri: PEERINFO,
+		headers: {
+                        'Accept': 'application/json',
+			'User-Agent': 'lta',
+		},
+                json: true,
+	};
+	request(options).then(function(peers) {
+		peers.forEach(function(val, i, peers)  {
+			var address = peers[i].addr.substring(0, peers[i].addr.lastIndexOf(':')).replace('[', '').replace(']', '');
+			peers[i].ip = address;
+			options.uri = GEOAPI + address;
+			request(options).then(function(geoloc) {
+				db.writePoints([{
+					measurement: 'peerInfo',
+					fields: {
+						address: peers[i].ip,
+					},
+					tags: {
+						country: geoloc.country,
+						countryCode: geoloc.countryCode,
+						protocol: peers[i].version,
+						version: peers[i].subver.replace('/', '').replace('/', ''),
+					},
+				}], {
+					precision: 's',
+				}).catch(err => {
+					console.error(err);
+				});
+			}).catch(err => {
+				console.error(err);
+			});
+		});
+	}).catch(err => {
+		console.error(err);
+	});
+}
 
 function dbWriteRichlistStats() {
 	var richlistUrl = BLOCKEXPLORERAPI.replace('api', 'richlist');
@@ -347,12 +401,14 @@ function dbWriteYobitStats() {
 	});
 }
 
+dbWritePeerStats();
 dbWriteRichlistStats();
 dbWriteHashStats();
 dbWritePoolStats();
 dbWriteBlockStats();
 dbWritePriceStats();
 dbWriteYobitStats();
+setInterval(function() { dbWritePeerStats(); }, 60 * 60 * 1000); // every 1 hours
 setInterval(function() { dbWriteRichlistStats(); }, 60 * 60 * 1000); // every 1 hours
 setInterval(function() { dbWriteHashStats(); }, 15 * 1000); // every 15 sec
 setInterval(function() { dbWritePoolStats(); }, 15 * 1000); // devery 15 sec
